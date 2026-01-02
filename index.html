@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Random Word Meaning Game</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAT Word Practice</title>
 
-  <!-- PapaParse -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
@@ -19,17 +18,21 @@
       cursor: pointer;
     }
     #wordDisplay {
-      font-size: 24px;
-      margin-top: 15px;
+      font-size: 28px;
+      margin-top: 16px;
     }
     #definitionDisplay {
       font-size: 18px;
       margin-top: 10px;
-      color: #333;
+    }
+    #metaDisplay {
+      font-size: 14px;
+      margin-top: 6px;
+      color: #444;
     }
     #status {
-      margin-top: 8px;
-      color: #555;
+      margin-top: 10px;
+      color: #333;
     }
     button {
       margin-right: 6px;
@@ -44,16 +47,17 @@
 
 <div id="alphaFilters"></div>
 
-<div id="wordDisplay">Press "Next Word" to start</div>
+<div id="wordDisplay">Press Next Word to start</div>
 <div id="definitionDisplay"></div>
+<div id="metaDisplay"></div>
 <div id="status">Loading vocabulary…</div>
 
 <button id="nextButton">Next Word</button>
 <button id="showMeaning">Show Meaning</button>
-<button id="showMeaningOnly">Show Meaning (No Sound)</button>
+<button id="showMeaningOnly">Show Meaning No Sound</button>
 
 <script>
-  const CSV_FILE = "sat_vocabulary.csv";
+  const CSV_URL = "./sat_vocabulary.csv";
 
   let allWords = [];
   let filteredWords = [];
@@ -63,7 +67,12 @@
 
   const wordDisplay = document.getElementById("wordDisplay");
   const definitionDisplay = document.getElementById("definitionDisplay");
+  const metaDisplay = document.getElementById("metaDisplay");
   const statusEl = document.getElementById("status");
+
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+  }
 
   function buildAlphabetButtons() {
     const container = document.getElementById("alphaFilters");
@@ -80,56 +89,80 @@
     container.appendChild(makeBtn("All", "all"));
 
     for (let i = 65; i <= 90; i++) {
-      container.appendChild(makeBtn(String.fromCharCode(i), String.fromCharCode(i)));
+      const letter = String.fromCharCode(i);
+      container.appendChild(makeBtn(letter, letter));
     }
 
     container.addEventListener("click", e => {
-      if (!e.target.dataset.letter) return;
-      currentFilter = e.target.dataset.letter;
+      const btn = e.target.closest("button.alpha-filter");
+      if (!btn) return;
+      currentFilter = btn.dataset.letter;
       applyFilter();
     });
   }
 
   function loadCSV() {
-    Papa.parse(CSV_FILE, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: res => {
-        allWords = res.data
+    setStatus("loadCSV started. Fetching " + CSV_URL);
+
+    fetch(CSV_URL, { cache: "no-store" })
+      .then(r => {
+        if (!r.ok) throw new Error("CSV fetch failed. Status " + r.status);
+        return r.text();
+      })
+      .then(text => {
+        const parsed = Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true
+        });
+
+        allWords = (parsed.data || [])
           .map(r => ({
-            word: (r.word || "").trim(),
-            definition: (r.definition || "").trim(),
-            part: (r["part of speech"] || "").trim(),
-            example: (r.example || "").trim()
+            word: ((r.word || r.Word || "") + "").trim(),
+            definition: ((r.definition || r.Definition || "") + "").trim(),
+            part: ((r["part of speech"] || r["Part of Speech"] || r.part || "") + "").trim(),
+            example: ((r.example || r.Example || "") + "").trim()
           }))
-          .filter(r => r.word && r.definition);
+          .filter(r => r.word.length > 0 && r.definition.length > 0);
 
         filteredWords = allWords;
         usedIndexes.clear();
 
-        statusEl.textContent = "Loaded " + allWords.length + " words";
-      },
-      error: () => {
-        statusEl.textContent = "Failed to load CSV";
-      }
-    });
+        if (allWords.length === 0) {
+          setStatus("CSV loaded but no usable rows. Check headers.");
+          return;
+        }
+
+        setStatus("Loaded " + allWords.length + " words");
+      })
+      .catch(err => {
+        setStatus(err.message);
+      });
   }
 
   function applyFilter() {
+    if (!allWords.length) {
+      setStatus("No words loaded yet");
+      return;
+    }
+
     if (currentFilter === "all") {
       filteredWords = allWords;
     } else {
       filteredWords = allWords.filter(w => w.word[0].toUpperCase() === currentFilter);
     }
+
     usedIndexes.clear();
-    wordDisplay.textContent = 'Press "Next Word" to start';
+    currentWord = null;
+
+    wordDisplay.textContent = "Press Next Word to start";
     definitionDisplay.textContent = "";
-    statusEl.textContent = "Filter: " + currentFilter + " (" + filteredWords.length + " words)";
+    metaDisplay.textContent = "";
+
+    setStatus("Filter " + (currentFilter === "all" ? "All" : currentFilter) + " with " + filteredWords.length + " words");
   }
 
   function getNextWord() {
-    if (filteredWords.length === 0) return null;
+    if (!filteredWords.length) return null;
 
     let available = filteredWords
       .map((_, i) => i)
@@ -146,11 +179,37 @@
   }
 
   function showNextWord() {
+    if (!allWords.length) {
+      setStatus("Words not loaded. Check CSV.");
+      return;
+    }
+
     currentWord = getNextWord();
     if (!currentWord) return;
 
     wordDisplay.textContent = currentWord.word;
     definitionDisplay.textContent = "";
+    metaDisplay.textContent = currentWord.part ? "Part of speech: " + currentWord.part : "";
   }
 
-  function showMeaning(pl
+  function showMeaning(playSound) {
+    if (!currentWord) return;
+
+    definitionDisplay.textContent = currentWord.definition;
+
+    if (playSound) {
+      speechSynthesis.cancel();
+      speechSynthesis.speak(new SpeechSynthesisUtterance(currentWord.definition));
+    }
+  }
+
+  document.getElementById("nextButton").onclick = showNextWord;
+  document.getElementById("showMeaning").onclick = () => showMeaning(true);
+  document.getElementById("showMeaningOnly").onclick = () => showMeaning(false);
+
+  buildAlphabetButtons();
+  loadCSV();
+</script>
+
+</body>
+</html>

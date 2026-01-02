@@ -8,208 +8,373 @@
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 16px;
+    body{
+      margin:0;
+      font-family:system-ui, Arial, sans-serif;
+      background:#0b0f19;
+      color:#eef2ff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+      padding:14px;
+      box-sizing:border-box;
     }
-    .alpha-filter {
-      margin: 3px;
-      padding: 4px 8px;
-      cursor: pointer;
+    .card{
+      width:96vw;
+      max-width:820px;
+      background:#111a2e;
+      border-radius:18px;
+      padding:18px;
+      box-sizing:border-box;
+      text-align:center;
     }
-    #wordDisplay {
-      font-size: 28px;
-      margin-top: 16px;
+    h1{
+      margin:6px 0 12px 0;
+      font-size:22px;
+      font-weight:700;
+      letter-spacing:0.2px;
     }
-    #definitionDisplay {
-      font-size: 18px;
-      margin-top: 10px;
+    #alphaFilters{
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin-bottom:14px;
     }
-    #metaDisplay {
-      font-size: 14px;
-      margin-top: 6px;
-      color: #444;
+    .alpha-filter{
+      border:none;
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      font-size:14px;
+      background:rgba(255,255,255,0.10);
+      color:#eef2ff;
+      transition:transform 0.05s ease;
+      min-width:44px;
+      touch-action:manipulation;
     }
-    #status {
-      margin-top: 10px;
-      color: #333;
+    .alpha-filter:active{
+      transform:scale(0.98);
     }
-    button {
-      margin-right: 6px;
-      margin-top: 8px;
+    .alpha-filter.active{
+      background:rgba(255,255,255,0.18);
+      outline:1px solid rgba(255,255,255,0.25);
+    }
+
+    #wordDisplay{
+      font-size:34px;
+      font-weight:800;
+      margin-top:8px;
+      line-height:1.15;
+      word-break:break-word;
+    }
+    #metaDisplay{
+      margin-top:8px;
+      font-size:14px;
+      color:rgba(238,242,255,0.82);
+    }
+    .panel{
+      margin-top:12px;
+      background:rgba(255,255,255,0.06);
+      border-radius:14px;
+      padding:12px;
+      text-align:left;
+    }
+    .label{
+      font-size:13px;
+      color:rgba(238,242,255,0.75);
+      margin-bottom:6px;
+    }
+    #definitionDisplay, #exampleDisplay{
+      font-size:16px;
+      line-height:1.35;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+
+    #status{
+      margin-top:12px;
+      font-size:13px;
+      color:rgba(238,242,255,0.75);
+    }
+
+    .btnRow{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin-top:14px;
+    }
+    .btn{
+      border:none;
+      border-radius:14px;
+      padding:12px 14px;
+      cursor:pointer;
+      font-size:15px;
+      background:rgba(255,255,255,0.10);
+      color:#eef2ff;
+      min-width:160px;
+      touch-action:manipulation;
+    }
+    .btn:active{
+      transform:scale(0.98);
+    }
+    .btn.primary{
+      background:rgba(255,255,255,0.16);
+    }
+
+    @media (max-width:420px){
+      #wordDisplay{ font-size:30px; }
+      .btn{ min-width:148px; }
+      .alpha-filter{ padding:10px 10px; }
     }
   </style>
 </head>
 
 <body>
+  <div class="card">
+    <h1>Random Word Meaning Game</h1>
 
-<h1>Random Word Meaning Game</h1>
+    <div id="alphaFilters"></div>
 
-<div id="alphaFilters"></div>
+    <div id="wordDisplay">Press Next Word to start</div>
+    <div id="metaDisplay"></div>
 
-<div id="wordDisplay">Press Next Word to start</div>
-<div id="definitionDisplay"></div>
-<div id="metaDisplay"></div>
-<div id="status">Loading vocabulary…</div>
+    <div class="panel">
+      <div class="label">Meaning</div>
+      <div id="definitionDisplay"></div>
+    </div>
 
-<button id="nextButton">Next Word</button>
-<button id="showMeaning">Show Meaning</button>
-<button id="showMeaningOnly">Show Meaning No Sound</button>
+    <div class="panel">
+      <div class="label">Example</div>
+      <div id="exampleDisplay"></div>
+    </div>
 
-<script>
-  const CSV_URL = "./sat_vocabulary.csv";
+    <div id="status">Loading vocabulary...</div>
 
-  let allWords = [];
-  let filteredWords = [];
-  let usedIndexes = new Set();
-  let currentWord = null;
-  let currentFilter = "all";
+    <div class="btnRow">
+      <button class="btn primary" id="nextButton">Next Word</button>
+    </div>
 
-  const wordDisplay = document.getElementById("wordDisplay");
-  const definitionDisplay = document.getElementById("definitionDisplay");
-  const metaDisplay = document.getElementById("metaDisplay");
-  const statusEl = document.getElementById("status");
+    <div class="btnRow">
+      <button class="btn" id="showDefOnly">Show Meaning No Sound</button>
+      <button class="btn" id="showDefSpeak">Show Meaning Speak</button>
+    </div>
 
-  function setStatus(msg) {
-    statusEl.textContent = msg;
-  }
+    <div class="btnRow">
+      <button class="btn" id="showExOnly">Show Example No Sound</button>
+      <button class="btn" id="showExSpeak">Show Example Speak</button>
+    </div>
+  </div>
 
-  function buildAlphabetButtons() {
-    const container = document.getElementById("alphaFilters");
-    container.innerHTML = "";
+  <script>
+    const CSV_URL = "./sat_vocabulary.csv";
 
-    const makeBtn = (label, value) => {
-      const b = document.createElement("button");
-      b.textContent = label;
-      b.className = "alpha-filter";
-      b.dataset.letter = value;
-      return b;
-    };
+    let allWords = [];
+    let filteredWords = [];
+    let usedIndexes = new Set();
+    let currentWord = null;
+    let currentFilter = "all";
 
-    container.appendChild(makeBtn("All", "all"));
+    const alphaFiltersEl = document.getElementById("alphaFilters");
+    const wordDisplay = document.getElementById("wordDisplay");
+    const definitionDisplay = document.getElementById("definitionDisplay");
+    const exampleDisplay = document.getElementById("exampleDisplay");
+    const metaDisplay = document.getElementById("metaDisplay");
+    const statusEl = document.getElementById("status");
 
-    for (let i = 65; i <= 90; i++) {
-      const letter = String.fromCharCode(i);
-      container.appendChild(makeBtn(letter, letter));
+    function setStatus(msg) {
+      statusEl.textContent = msg;
     }
 
-    container.addEventListener("click", e => {
-      const btn = e.target.closest("button.alpha-filter");
-      if (!btn) return;
-      currentFilter = btn.dataset.letter;
-      applyFilter();
-    });
-  }
+    function normalizeRow(r) {
+      const word = ((r.word || r.Word || "") + "").trim();
+      const definition = ((r.definition || r.Definition || "") + "").trim();
+      const part = ((r["part of speech"] || r["Part of Speech"] || r.part || "") + "").trim();
+      const example = ((r.example || r.Example || "") + "").trim();
+      return { word, definition, part, example };
+    }
 
-  function loadCSV() {
-    setStatus("loadCSV started. Fetching " + CSV_URL);
+    function buildAlphabetButtons() {
+      alphaFiltersEl.innerHTML = "";
 
-    fetch(CSV_URL, { cache: "no-store" })
-      .then(r => {
-        if (!r.ok) throw new Error("CSV fetch failed. Status " + r.status);
-        return r.text();
-      })
-      .then(text => {
-        const parsed = Papa.parse(text, {
-          header: true,
-          skipEmptyLines: true
+      const makeBtn = (label, value) => {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.className = "alpha-filter" + (value === "all" ? " active" : "");
+        b.dataset.letter = value;
+        return b;
+      };
+
+      alphaFiltersEl.appendChild(makeBtn("All", "all"));
+      for (let i = 65; i <= 90; i++) {
+        const letter = String.fromCharCode(i);
+        alphaFiltersEl.appendChild(makeBtn(letter, letter));
+      }
+
+      alphaFiltersEl.addEventListener("click", (e) => {
+        const btn = e.target.closest("button.alpha-filter");
+        if (!btn) return;
+
+        currentFilter = btn.dataset.letter;
+
+        Array.from(alphaFiltersEl.querySelectorAll(".alpha-filter")).forEach(b => {
+          b.classList.toggle("active", b.dataset.letter === currentFilter);
         });
 
-        allWords = (parsed.data || [])
-          .map(r => ({
-            word: ((r.word || r.Word || "") + "").trim(),
-            definition: ((r.definition || r.Definition || "") + "").trim(),
-            part: ((r["part of speech"] || r["Part of Speech"] || r.part || "") + "").trim(),
-            example: ((r.example || r.Example || "") + "").trim()
-          }))
-          .filter(r => r.word.length > 0 && r.definition.length > 0);
-
-        filteredWords = allWords;
-        usedIndexes.clear();
-
-        if (allWords.length === 0) {
-          setStatus("CSV loaded but no usable rows. Check headers.");
-          return;
-        }
-
-        setStatus("Loaded " + allWords.length + " words");
-      })
-      .catch(err => {
-        setStatus(err.message);
+        applyFilter();
       });
-  }
-
-  function applyFilter() {
-    if (!allWords.length) {
-      setStatus("No words loaded yet");
-      return;
     }
 
-    if (currentFilter === "all") {
-      filteredWords = allWords;
-    } else {
-      filteredWords = allWords.filter(w => w.word[0].toUpperCase() === currentFilter);
+    function loadCSV() {
+      setStatus("Loading vocabulary...");
+
+      fetch(CSV_URL, { cache: "no-store" })
+        .then(r => {
+          if (!r.ok) throw new Error("CSV fetch failed. Status " + r.status);
+          return r.text();
+        })
+        .then(text => {
+          const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+
+          allWords = (parsed.data || [])
+            .map(normalizeRow)
+            .filter(x => x.word.length > 0 && (x.definition.length > 0 || x.example.length > 0));
+
+          filteredWords = allWords;
+          usedIndexes.clear();
+
+          if (!allWords.length) {
+            setStatus('CSV loaded but 0 usable rows. Check headers: word, definition, part of speech, example.');
+            return;
+          }
+
+          setStatus("Loaded " + allWords.length + " words");
+        })
+        .catch(err => {
+          setStatus(err.message);
+        });
     }
 
-    usedIndexes.clear();
-    currentWord = null;
+    function applyFilter() {
+      if (!allWords.length) {
+        setStatus("No words loaded yet");
+        return;
+      }
 
-    wordDisplay.textContent = "Press Next Word to start";
-    definitionDisplay.textContent = "";
-    metaDisplay.textContent = "";
+      if (currentFilter === "all") {
+        filteredWords = allWords;
+      } else {
+        filteredWords = allWords.filter(w => (w.word[0] || "").toUpperCase() === currentFilter);
+      }
 
-    setStatus("Filter " + (currentFilter === "all" ? "All" : currentFilter) + " with " + filteredWords.length + " words");
-  }
-
-  function getNextWord() {
-    if (!filteredWords.length) return null;
-
-    let available = filteredWords
-      .map((_, i) => i)
-      .filter(i => !usedIndexes.has(i));
-
-    if (available.length === 0) {
       usedIndexes.clear();
-      available = filteredWords.map((_, i) => i);
+      currentWord = null;
+
+      wordDisplay.textContent = "Press Next Word to start";
+      metaDisplay.textContent = "";
+      definitionDisplay.textContent = "";
+      exampleDisplay.textContent = "";
+
+      setStatus("Filter: " + (currentFilter === "all" ? "All" : currentFilter) + " (" + filteredWords.length + " words)");
     }
 
-    const idx = available[Math.floor(Math.random() * available.length)];
-    usedIndexes.add(idx);
-    return filteredWords[idx];
-  }
+    function getNextWord() {
+      if (!filteredWords.length) return null;
 
-  function showNextWord() {
-    if (!allWords.length) {
-      setStatus("Words not loaded. Check CSV.");
-      return;
+      let available = filteredWords
+        .map((_, i) => i)
+        .filter(i => !usedIndexes.has(i));
+
+      if (!available.length) {
+        usedIndexes.clear();
+        available = filteredWords.map((_, i) => i);
+      }
+
+      const idx = available[Math.floor(Math.random() * available.length)];
+      usedIndexes.add(idx);
+      return filteredWords[idx];
     }
 
-    currentWord = getNextWord();
-    if (!currentWord) return;
+    function showNextWord() {
+      if (!allWords.length) {
+        setStatus("Words not loaded. Check CSV.");
+        return;
+      }
+      if (!filteredWords.length) {
+        setStatus("No words for this filter.");
+        return;
+      }
 
-    wordDisplay.textContent = currentWord.word;
-    definitionDisplay.textContent = "";
-    metaDisplay.textContent = currentWord.part ? "Part of speech: " + currentWord.part : "";
-  }
+      currentWord = getNextWord();
+      if (!currentWord) return;
 
-  function showMeaning(playSound) {
-    if (!currentWord) return;
+      wordDisplay.textContent = currentWord.word;
+      metaDisplay.textContent = currentWord.part ? ("Part of speech: " + currentWord.part) : "";
+      definitionDisplay.textContent = "";
+      exampleDisplay.textContent = "";
 
-    definitionDisplay.textContent = currentWord.definition;
-
-    if (playSound) {
-      speechSynthesis.cancel();
-      speechSynthesis.speak(new SpeechSynthesisUtterance(currentWord.definition));
+      const remaining = filteredWords.length - usedIndexes.size;
+      setStatus("Ready. Remaining before reset: " + remaining);
     }
-  }
 
-  document.getElementById("nextButton").onclick = showNextWord;
-  document.getElementById("showMeaning").onclick = () => showMeaning(true);
-  document.getElementById("showMeaningOnly").onclick = () => showMeaning(false);
+    function speakWordThenText(word, text) {
+      if (!word || !text) return;
 
-  buildAlphabetButtons();
-  loadCSV();
-</script>
+      try {
+        speechSynthesis.cancel();
 
+        const uWord = new SpeechSynthesisUtterance(word);
+        uWord.rate = 0.70;
+
+        const uText = new SpeechSynthesisUtterance(text);
+        uText.rate = 1.00;
+
+        uWord.onend = () => {
+          setTimeout(() => {
+            speechSynthesis.speak(uText);
+          }, 450);
+        };
+
+        speechSynthesis.speak(uWord);
+      } catch (e) {
+        setStatus("Speech not available in this browser.");
+      }
+    }
+
+    function showMeaning(playSound) {
+      if (!currentWord) return;
+
+      const def = currentWord.definition || "";
+      definitionDisplay.textContent = def ? def : "No meaning available.";
+
+      if (playSound && def) {
+        speakWordThenText(currentWord.word, def);
+      }
+    }
+
+    function showExample(playSound) {
+      if (!currentWord) return;
+
+      const ex = currentWord.example || "";
+      exampleDisplay.textContent = ex ? ex : "No example available.";
+
+      if (playSound && ex) {
+        speakWordThenText(currentWord.word, ex);
+      }
+    }
+
+    document.getElementById("nextButton").addEventListener("click", showNextWord);
+
+    document.getElementById("showDefOnly").addEventListener("click", () => showMeaning(false));
+    document.getElementById("showDefSpeak").addEventListener("click", () => showMeaning(true));
+
+    document.getElementById("showExOnly").addEventListener("click", () => showExample(false));
+    document.getElementById("showExSpeak").addEventListener("click", () => showExample(true));
+
+    buildAlphabetButtons();
+    loadCSV();
+  </script>
 </body>
 </html>

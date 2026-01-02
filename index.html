@@ -90,10 +90,22 @@
       word-break:break-word;
     }
 
-    #status{
+    #counter{
       margin-top:12px;
       font-size:13px;
-      color:rgba(238,242,255,0.75);
+      color:rgba(238,242,255,0.85);
+      background:rgba(255,255,255,0.06);
+      border-radius:12px;
+      padding:10px 12px;
+      text-align:left;
+    }
+
+    #status{
+      margin-top:10px;
+      font-size:13px;
+      color:rgba(238,242,255,0.70);
+      text-align:left;
+      padding:0 2px;
     }
 
     .btnRow{
@@ -165,6 +177,7 @@
       <div id="exampleDisplay"></div>
     </div>
 
+    <div id="counter">Filter: All. Remaining before reset: 0 of 0.</div>
     <div id="status">Loading vocabulary...</div>
 
     <div class="btnRow">
@@ -197,8 +210,16 @@
     const exampleDisplay = document.getElementById("exampleDisplay");
     const metaDisplay = document.getElementById("metaDisplay");
     const statusEl = document.getElementById("status");
+    const counterEl = document.getElementById("counter");
 
     function setStatus(msg){ statusEl.textContent = msg; }
+
+    function setCounter(){
+      const total = filteredWords.length;
+      const remaining = total - usedIndexes.size;
+      const label = currentFilter === "all" ? "All" : currentFilter;
+      counterEl.textContent = "Filter: " + label + ". Remaining before reset: " + remaining + " of " + total + ".";
+    }
 
     function normalizeRow(r){
       const word = ((r.word || r.Word || "") + "").trim();
@@ -256,24 +277,27 @@
 
           filteredWords = allWords;
           usedIndexes.clear();
+          currentFilter = "all";
 
           if(!allWords.length){
             setStatus("CSV loaded but 0 usable rows. Check headers word, definition, part of speech, example.");
+            setCounter();
             return;
           }
 
-          setStatus(
-            "Loaded " + allWords.length +
-            " words · Filter: All · Remaining before reset: " +
-            allWords.length + " of " + allWords.length
-          );
+          setStatus("Loaded " + allWords.length + " words.");
+          setCounter();
         })
-        .catch(err => setStatus(err.message));
+        .catch(err => {
+          setStatus(err.message);
+          setCounter();
+        });
     }
 
     function applyFilter(){
       if(!allWords.length){
-        setStatus("No words loaded yet");
+        setStatus("No words loaded yet.");
+        setCounter();
         return;
       }
 
@@ -289,12 +313,8 @@
       definitionDisplay.textContent = "";
       exampleDisplay.textContent = "";
 
-      setStatus(
-        "Filter: " +
-        (currentFilter === "all" ? "All" : currentFilter) +
-        " · Remaining before reset: " +
-        filteredWords.length + " of " + filteredWords.length
-      );
+      setStatus("Ready.");
+      setCounter();
     }
 
     function getNextWord(){
@@ -314,29 +334,28 @@
     function showNextWord(){
       if(!allWords.length){
         setStatus("Words not loaded. Check CSV.");
+        setCounter();
         return;
       }
       if(!filteredWords.length){
         setStatus("No words for this filter.");
+        setCounter();
         return;
       }
 
       currentWord = getNextWord();
-      if(!currentWord) return;
+      if(!currentWord){
+        setCounter();
+        return;
+      }
 
       wordDisplay.textContent = currentWord.word;
       metaDisplay.textContent = currentWord.part ? ("Part of speech: " + currentWord.part) : "";
       definitionDisplay.textContent = "";
       exampleDisplay.textContent = "";
 
-      const remaining = filteredWords.length - usedIndexes.size;
-
-      setStatus(
-        "Filter: " +
-        (currentFilter === "all" ? "All" : currentFilter) +
-        " · Remaining before reset: " +
-        remaining + " of " + filteredWords.length
-      );
+      setStatus("Ready.");
+      setCounter();
     }
 
     function speakWordThenText(word, text){

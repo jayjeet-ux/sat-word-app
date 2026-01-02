@@ -47,45 +47,53 @@
       border-radius:12px;
       padding:10px 12px;
       font-size:14px;
-      background:#1c2542;
+      background:rgba(255,255,255,0.10);
       color:#eef2ff;
+      cursor:pointer;
+      min-width:44px;
+      touch-action:manipulation;
     }
     .alpha-filter.active{
-      background:#3b82f6;
+      background:rgba(255,255,255,0.18);
+      outline:1px solid rgba(255,255,255,0.25);
     }
 
     #wordDisplay{
       font-size:34px;
       font-weight:800;
       margin-top:8px;
+      line-height:1.15;
+      word-break:break-word;
     }
     #metaDisplay{
       margin-top:6px;
       font-size:14px;
-      color:#c7d2fe;
+      color:rgba(238,242,255,0.82);
     }
 
     .panel{
       margin-top:12px;
-      background:#1a2240;
+      background:rgba(255,255,255,0.06);
       border-radius:14px;
       padding:12px;
       text-align:left;
     }
     .label{
       font-size:13px;
-      color:#93c5fd;
+      color:rgba(238,242,255,0.75);
       margin-bottom:6px;
     }
     #definitionDisplay, #exampleDisplay{
       font-size:16px;
       line-height:1.35;
+      white-space:pre-wrap;
+      word-break:break-word;
     }
 
     #status{
       margin-top:12px;
       font-size:13px;
-      color:#a5b4fc;
+      color:rgba(238,242,255,0.75);
     }
 
     .btnRow{
@@ -95,151 +103,288 @@
       flex-wrap:wrap;
       margin-top:14px;
     }
+
     .btn{
       border:none;
       border-radius:14px;
       padding:12px 14px;
       font-size:15px;
+      font-weight:650;
       color:#0b0f19;
-      min-width:160px;
+      min-width:170px;
+      cursor:pointer;
+      touch-action:manipulation;
+      box-shadow:0 10px 22px rgba(0,0,0,0.22);
     }
+    .btn:active{ transform:scale(0.98); }
 
-    .btn-next{ background:#22c55e; }
-    .btn-meaning-speak{ background:#60a5fa; }
-    .btn-meaning-nosound{ background:#93c5fd; }
-    .btn-example-speak{ background:#fbbf24; }
-    .btn-example-nosound{ background:#fde68a; }
+    .btn-next{
+      background:linear-gradient(135deg,#22c55e,#16a34a);
+      color:#06110a;
+    }
+    .btn-meaning-nosound{
+      background:linear-gradient(135deg,#a78bfa,#7c3aed);
+      color:#070215;
+    }
+    .btn-meaning-speak{
+      background:linear-gradient(135deg,#60a5fa,#2563eb);
+      color:#06101f;
+    }
+    .btn-example-nosound{
+      background:linear-gradient(135deg,#fcd34d,#f59e0b);
+      color:#201401;
+    }
+    .btn-example-speak{
+      background:linear-gradient(135deg,#fb7185,#e11d48);
+      color:#220107;
+    }
 
     @media (max-width:420px){
       #wordDisplay{ font-size:30px; }
-      .btn{ min-width:145px; }
+      .btn{ min-width:150px; padding:12px 12px; }
     }
   </style>
 </head>
 
 <body>
-<div class="card">
-  <h1>Random Word Meaning Game</h1>
+  <div class="card">
+    <h1>Random Word Meaning Game</h1>
 
-  <div id="alphaFilters"></div>
+    <div id="alphaFilters"></div>
 
-  <div id="wordDisplay">Press Next Word to start</div>
-  <div id="metaDisplay"></div>
+    <div id="wordDisplay">Press Next Word to start</div>
+    <div id="metaDisplay"></div>
 
-  <div class="panel">
-    <div class="label">Meaning</div>
-    <div id="definitionDisplay"></div>
+    <div class="panel">
+      <div class="label">Meaning</div>
+      <div id="definitionDisplay"></div>
+    </div>
+
+    <div class="panel">
+      <div class="label">Example</div>
+      <div id="exampleDisplay"></div>
+    </div>
+
+    <div id="status">Loading vocabulary...</div>
+
+    <div class="btnRow">
+      <button class="btn btn-next" id="nextButton">Next Word</button>
+    </div>
+
+    <div class="btnRow">
+      <button class="btn btn-meaning-nosound" id="showDefOnly">Show Meaning No Sound</button>
+      <button class="btn btn-meaning-speak" id="showDefSpeak">Show Meaning Speak</button>
+    </div>
+
+    <div class="btnRow">
+      <button class="btn btn-example-nosound" id="showExOnly">Show Example No Sound</button>
+      <button class="btn btn-example-speak" id="showExSpeak">Show Example Speak</button>
+    </div>
   </div>
 
-  <div class="panel">
-    <div class="label">Example</div>
-    <div id="exampleDisplay"></div>
-  </div>
+  <script>
+    const CSV_URL = "./sat_vocabulary.csv";
 
-  <div id="status">Loading vocabulary...</div>
+    let allWords = [];
+    let filteredWords = [];
+    let usedIndexes = new Set();
+    let currentWord = null;
+    let currentFilter = "all";
 
-  <div class="btnRow">
-    <button class="btn btn-next" id="nextButton">Next Word</button>
-  </div>
+    const alphaFiltersEl = document.getElementById("alphaFilters");
+    const wordDisplay = document.getElementById("wordDisplay");
+    const definitionDisplay = document.getElementById("definitionDisplay");
+    const exampleDisplay = document.getElementById("exampleDisplay");
+    const metaDisplay = document.getElementById("metaDisplay");
+    const statusEl = document.getElementById("status");
 
-  <div class="btnRow">
-    <button class="btn btn-meaning-nosound" id="showDefOnly">Meaning No Sound</button>
-    <button class="btn btn-meaning-speak" id="showDefSpeak">Meaning Speak</button>
-  </div>
+    function setStatus(msg){ statusEl.textContent = msg; }
 
-  <div class="btnRow">
-    <button class="btn btn-example-nosound" id="showExOnly">Example No Sound</button>
-    <button class="btn btn-example-speak" id="showExSpeak">Example Speak</button>
-  </div>
-</div>
+    function normalizeRow(r){
+      const word = ((r.word || r.Word || "") + "").trim();
+      const definition = ((r.definition || r.Definition || "") + "").trim();
+      const part = ((r["part of speech"] || r["Part of Speech"] || r.part || "") + "").trim();
+      const example = ((r.example || r.Example || "") + "").trim();
+      return { word, definition, part, example };
+    }
 
-<script>
-const CSV_URL="./sat_vocabulary.csv";
-let allWords=[],filteredWords=[],usedIndexes=new Set(),currentWord=null,currentFilter="all";
-const alphaFiltersEl=document.getElementById("alphaFilters");
-const wordDisplay=document.getElementById("wordDisplay");
-const definitionDisplay=document.getElementById("definitionDisplay");
-const exampleDisplay=document.getElementById("exampleDisplay");
-const metaDisplay=document.getElementById("metaDisplay");
-const statusEl=document.getElementById("status");
+    function buildAlphabetButtons(){
+      alphaFiltersEl.innerHTML = "";
 
-function normalizeRow(r){
-  return{
-    word:(r.word||"").trim(),
-    definition:(r.definition||"").trim(),
-    part:(r["part of speech"]||"").trim(),
-    example:(r.example||"").trim()
-  };
-}
+      const makeBtn = (label, value, active) => {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.className = "alpha-filter" + (active ? " active" : "");
+        b.dataset.letter = value;
+        return b;
+      };
 
-function buildAlphabetButtons(){
-  alphaFiltersEl.innerHTML="";
-  const letters=["all",...Array.from({length:26},(_,i)=>String.fromCharCode(65+i))];
-  letters.forEach(l=>{
-    const b=document.createElement("button");
-    b.className="alpha-filter"+(l==="all"?" active":"");
-    b.textContent=l==="all"?"All":l;
-    b.dataset.letter=l;
-    alphaFiltersEl.appendChild(b);
-  });
-  alphaFiltersEl.onclick=e=>{
-    if(!e.target.dataset.letter)return;
-    currentFilter=e.target.dataset.letter;
-    document.querySelectorAll(".alpha-filter").forEach(b=>b.classList.toggle("active",b.dataset.letter===currentFilter));
-    applyFilter();
-  };
-}
+      alphaFiltersEl.appendChild(makeBtn("All","all",true));
+      for(let i=65;i<=90;i++){
+        const letter = String.fromCharCode(i);
+        alphaFiltersEl.appendChild(makeBtn(letter,letter,false));
+      }
 
-function loadCSV(){
-  fetch(CSV_URL).then(r=>r.text()).then(t=>{
-    const p=Papa.parse(t,{header:true,skipEmptyLines:true});
-    allWords=p.data.map(normalizeRow).filter(x=>x.word);
-    filteredWords=allWords;
-    statusEl.textContent="Loaded "+allWords.length+" words";
-  });
-}
+      alphaFiltersEl.addEventListener("click", (e) => {
+        const btn = e.target.closest("button.alpha-filter");
+        if(!btn) return;
 
-function applyFilter(){
-  filteredWords=currentFilter==="all"?allWords:allWords.filter(w=>w.word[0].toUpperCase()===currentFilter);
-  usedIndexes.clear();
-  wordDisplay.textContent="Press Next Word to start";
-  definitionDisplay.textContent="";
-  exampleDisplay.textContent="";
-}
+        currentFilter = btn.dataset.letter;
 
-function getNextWord(){
-  let idxs=filteredWords.map((_,i)=>i).filter(i=>!usedIndexes.has(i));
-  if(!idxs.length){usedIndexes.clear();idxs=filteredWords.map((_,i)=>i);}
-  const i=idxs[Math.floor(Math.random()*idxs.length)];
-  usedIndexes.add(i);
-  return filteredWords[i];
-}
+        Array.from(alphaFiltersEl.querySelectorAll(".alpha-filter")).forEach(b=>{
+          b.classList.toggle("active", b.dataset.letter === currentFilter);
+        });
 
-function showNextWord(){
-  currentWord=getNextWord();
-  if(!currentWord)return;
-  wordDisplay.textContent=currentWord.word;
-  metaDisplay.textContent=currentWord.part;
-  definitionDisplay.textContent="";
-  exampleDisplay.textContent="";
-}
+        applyFilter();
+      });
+    }
 
-function speakWordThenText(w,t){
-  speechSynthesis.cancel();
-  const u1=new SpeechSynthesisUtterance(w);u1.rate=0.65;
-  const u2=new SpeechSynthesisUtterance(t);
-  u1.onend=()=>setTimeout(()=>speechSynthesis.speak(u2),500);
-  speechSynthesis.speak(u1);
-}
+    function loadCSV(){
+      setStatus("Loading vocabulary...");
 
-document.getElementById("nextButton").onclick=showNextWord;
-document.getElementById("showDefOnly").onclick=()=>definitionDisplay.textContent=currentWord.definition;
-document.getElementById("showDefSpeak").onclick=()=>{definitionDisplay.textContent=currentWord.definition;speakWordThenText(currentWord.word,currentWord.definition);};
-document.getElementById("showExOnly").onclick=()=>exampleDisplay.textContent=currentWord.example;
-document.getElementById("showExSpeak").onclick=()=>{exampleDisplay.textContent=currentWord.example;speakWordThenText(currentWord.word,currentWord.example);};
+      fetch(CSV_URL, { cache: "no-store" })
+        .then(r => {
+          if(!r.ok) throw new Error("CSV fetch failed. Status " + r.status);
+          return r.text();
+        })
+        .then(text => {
+          const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
 
-buildAlphabetButtons();
-loadCSV();
-</script>
+          allWords = (parsed.data || [])
+            .map(normalizeRow)
+            .filter(x => x.word.length > 0 && (x.definition.length > 0 || x.example.length > 0));
+
+          filteredWords = allWords;
+          usedIndexes.clear();
+
+          if(!allWords.length){
+            setStatus("CSV loaded but 0 usable rows. Check headers word, definition, part of speech, example.");
+            return;
+          }
+
+          setStatus(
+            "Loaded " + allWords.length +
+            " words · Filter: All · Remaining before reset: " +
+            allWords.length + " of " + allWords.length
+          );
+        })
+        .catch(err => setStatus(err.message));
+    }
+
+    function applyFilter(){
+      if(!allWords.length){
+        setStatus("No words loaded yet");
+        return;
+      }
+
+      filteredWords = currentFilter === "all"
+        ? allWords
+        : allWords.filter(w => (w.word[0] || "").toUpperCase() === currentFilter);
+
+      usedIndexes.clear();
+      currentWord = null;
+
+      wordDisplay.textContent = "Press Next Word to start";
+      metaDisplay.textContent = "";
+      definitionDisplay.textContent = "";
+      exampleDisplay.textContent = "";
+
+      setStatus(
+        "Filter: " +
+        (currentFilter === "all" ? "All" : currentFilter) +
+        " · Remaining before reset: " +
+        filteredWords.length + " of " + filteredWords.length
+      );
+    }
+
+    function getNextWord(){
+      if(!filteredWords.length) return null;
+
+      let available = filteredWords.map((_,i)=>i).filter(i => !usedIndexes.has(i));
+      if(!available.length){
+        usedIndexes.clear();
+        available = filteredWords.map((_,i)=>i);
+      }
+
+      const idx = available[Math.floor(Math.random() * available.length)];
+      usedIndexes.add(idx);
+      return filteredWords[idx];
+    }
+
+    function showNextWord(){
+      if(!allWords.length){
+        setStatus("Words not loaded. Check CSV.");
+        return;
+      }
+      if(!filteredWords.length){
+        setStatus("No words for this filter.");
+        return;
+      }
+
+      currentWord = getNextWord();
+      if(!currentWord) return;
+
+      wordDisplay.textContent = currentWord.word;
+      metaDisplay.textContent = currentWord.part ? ("Part of speech: " + currentWord.part) : "";
+      definitionDisplay.textContent = "";
+      exampleDisplay.textContent = "";
+
+      const remaining = filteredWords.length - usedIndexes.size;
+
+      setStatus(
+        "Filter: " +
+        (currentFilter === "all" ? "All" : currentFilter) +
+        " · Remaining before reset: " +
+        remaining + " of " + filteredWords.length
+      );
+    }
+
+    function speakWordThenText(word, text){
+      if(!word || !text) return;
+
+      try{
+        speechSynthesis.cancel();
+
+        const uWord = new SpeechSynthesisUtterance(word);
+        uWord.rate = 0.65;
+
+        const uText = new SpeechSynthesisUtterance(text);
+        uText.rate = 1.0;
+
+        uWord.onend = () => {
+          setTimeout(() => speechSynthesis.speak(uText), 500);
+        };
+
+        speechSynthesis.speak(uWord);
+      }catch(e){
+        setStatus("Speech not available in this browser.");
+      }
+    }
+
+    function showMeaning(playSound){
+      if(!currentWord) return;
+      const def = currentWord.definition || "";
+      definitionDisplay.textContent = def ? def : "No meaning available.";
+      if(playSound && def) speakWordThenText(currentWord.word, def);
+    }
+
+    function showExample(playSound){
+      if(!currentWord) return;
+      const ex = currentWord.example || "";
+      exampleDisplay.textContent = ex ? ex : "No example available.";
+      if(playSound && ex) speakWordThenText(currentWord.word, ex);
+    }
+
+    document.getElementById("nextButton").addEventListener("click", showNextWord);
+
+    document.getElementById("showDefOnly").addEventListener("click", () => showMeaning(false));
+    document.getElementById("showDefSpeak").addEventListener("click", () => showMeaning(true));
+
+    document.getElementById("showExOnly").addEventListener("click", () => showExample(false));
+    document.getElementById("showExSpeak").addEventListener("click", () => showExample(true));
+
+    buildAlphabetButtons();
+    loadCSV();
+  </script>
 </body>
 </html>

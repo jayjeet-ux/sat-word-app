@@ -1,110 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Word Meaning Randomizer</title>
-    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-    <style>
-        .alpha-filter { margin: 5px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Random Word Meaning Game</title>
+
+  <!-- PapaParse -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 16px;
+    }
+    .alpha-filter {
+      margin: 3px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    #wordDisplay {
+      font-size: 24px;
+      margin-top: 15px;
+    }
+    #definitionDisplay {
+      font-size: 18px;
+      margin-top: 10px;
+      color: #333;
+    }
+    #status {
+      margin-top: 8px;
+      color: #555;
+    }
+    button {
+      margin-right: 6px;
+      margin-top: 8px;
+    }
+  </style>
 </head>
+
 <body>
-    <h1>Random Word Meaning Game</h1>
-    
-    <div id="alphaFilters">
-        <button class="alpha-filter" data-letter="all">All</button>
-        <script>
-            for (let i = 65; i <= 90; i++) {
-                document.write(`<button class="alpha-filter" data-letter="${String.fromCharCode(i)}">${String.fromCharCode(i)}</button>`);
-            }
-        </script>
-    </div>
-    
-    <div id="wordDisplay">Press "Next" to start</div>
-    <button id="nextButton">Next Word</button>
-    <button id="showMeaning">Show Meaning</button>
-    <button id="showMeaningOnly">Show Meaning (No Sound)</button>
 
-    <script>
-        let words = [];
-        let filteredWords = [];
-        let currentWord = null;
-        let usedIndices = new Set(); // Track used indices to avoid repetition
+<h1>Random Word Meaning Game</h1>
 
-        function loadCSV(callback) {
-            Papa.parse('sat_vocabulary.csv', {
-                download: true,
-                header: true,
-                complete: function(results) {
-                    words = results.data;
-                    filteredWords = words;
-                    resetUsedIndices();
-                    callback();
-                }
-            });
-        }
+<div id="alphaFilters"></div>
 
-        function resetUsedIndices() {
-            usedIndices.clear();
-        }
+<div id="wordDisplay">Press "Next Word" to start</div>
+<div id="definitionDisplay"></div>
+<div id="status">Loading vocabulary…</div>
 
-        function getNextWord() {
-            let availableIndices = filteredWords
-                .map((_, index) => index)
-                .filter(index => !usedIndices.has(index));
+<button id="nextButton">Next Word</button>
+<button id="showMeaning">Show Meaning</button>
+<button id="showMeaningOnly">Show Meaning (No Sound)</button>
 
-            if (availableIndices.length === 0) {
-                // If we've used all words, reset
-                resetUsedIndices();
-                availableIndices = filteredWords.map((_, index) => index);
-            }
+<script>
+  const CSV_FILE = "sat_vocabulary.csv";
 
-            // Pick a random index from available ones
-            const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
-            usedIndices.add(randomIndex);
-            return filteredWords[randomIndex];
-        }
+  let allWords = [];
+  let filteredWords = [];
+  let usedIndexes = new Set();
+  let currentWord = null;
+  let currentFilter = "all";
 
-        function showNextWord() {
-            currentWord = getNextWord();
-            document.getElementById('wordDisplay').innerText = currentWord.word;
-        }
+  const wordDisplay = document.getElementById("wordDisplay");
+  const definitionDisplay = document.getElementById("definitionDisplay");
+  const statusEl = document.getElementById("status");
 
-        function showMeaning(playSound = true) {
-            if (currentWord) {
-                alert("Meaning: " + currentWord.meaning);
-                if (playSound) {
-                    const utterance = new SpeechSynthesisUtterance(currentWord.meaning);
-                    speechSynthesis.speak(utterance);
-                }
-            }
-        }
+  function buildAlphabetButtons() {
+    const container = document.getElementById("alphaFilters");
+    container.innerHTML = "";
 
-        function filterWordsByLetter(letter) {
-            if (letter === 'all') {
-                filteredWords = words;
-            } else {
-                filteredWords = words.filter(w => w.word.charAt(0).toUpperCase() === letter);
-            }
-            resetUsedIndices();
-        }
+    const makeBtn = (label, value) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.className = "alpha-filter";
+      b.dataset.letter = value;
+      return b;
+    };
 
-        document.getElementById('nextButton').addEventListener('click', showNextWord);
-        document.getElementById('showMeaning').addEventListener('click', () => showMeaning(true));
-        document.getElementById('showMeaningOnly').addEventListener('click', () => showMeaning(false));
+    container.appendChild(makeBtn("All", "all"));
 
-        document.querySelectorAll('.alpha-filter').forEach(button => {
-            button.addEventListener('click', function() {
-                const letter = this.getAttribute('data-letter');
-                filterWordsByLetter(letter);
-            });
-        });
+    for (let i = 65; i <= 90; i++) {
+      container.appendChild(makeBtn(String.fromCharCode(i), String.fromCharCode(i)));
+    }
 
-        loadCSV(() => {
-            console.log("CSV Loaded");
-        });
-    </script>
-</body>
-</html>
+    container.addEventListener("click", e => {
+      if (!e.target.dataset.letter) return;
+      currentFilter = e.target.dataset.letter;
+      applyFilter();
+    });
+  }
 
+  function loadCSV() {
+    Papa.parse(CSV_FILE, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: res => {
+        allWords = res.data
+          .map(r => ({
+            word: (r.word || "").trim(),
+            definition: (r.definition || "").trim(),
+            part: (r["part of speech"] || "").trim(),
+            example: (r.example || "").trim()
+          }))
+          .filter(r => r.word && r.definition);
+
+        filteredWords = allWords;
+        usedIndexes.clear();
+
+        statusEl.textContent = "Loaded " + allWords.length + " words";
+      },
+      error: () => {
+        statusEl.textContent = "Failed to load CSV";
+      }
+    });
+  }
+
+  function applyFilter() {
+    if (currentFilter === "all") {
+      filteredWords = allWords;
+    } else {
+      filteredWords = allWords.filter(w => w.word[0].toUpperCase() === currentFilter);
+    }
+    usedIndexes.clear();
+    wordDisplay.textContent = 'Press "Next Word" to start';
+    definitionDisplay.textContent = "";
+    statusEl.textContent = "Filter: " + currentFilter + " (" + filteredWords.length + " words)";
+  }
+
+  function getNextWord() {
+    if (filteredWords.length === 0) return null;
+
+    let available = filteredWords
+      .map((_, i) => i)
+      .filter(i => !usedIndexes.has(i));
+
+    if (available.length === 0) {
+      usedIndexes.clear();
+      available = filteredWords.map((_, i) => i);
+    }
+
+    const idx = available[Math.floor(Math.random() * available.length)];
+    usedIndexes.add(idx);
+    return filteredWords[idx];
+  }
+
+  function showNextWord() {
+    currentWord = getNextWord();
+    if (!currentWord) return;
+
+    wordDisplay.textContent = currentWord.word;
+    definitionDisplay.textContent = "";
+  }
+
+  function showMeaning(pl

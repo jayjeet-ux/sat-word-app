@@ -158,13 +158,13 @@
     </div>
 
     <div class="btnRow">
-      <button class="btn" id="showDefOnly">Show Meaning No Sound</button>
       <button class="btn" id="showDefSpeak">Show Meaning Speak</button>
+      <button class="btn" id="showDefOnly">Show Meaning No Sound</button>
     </div>
 
     <div class="btnRow">
-      <button class="btn" id="showExOnly">Show Example No Sound</button>
       <button class="btn" id="showExSpeak">Show Example Speak</button>
+      <button class="btn" id="showExOnly">Show Example No Sound</button>
     </div>
   </div>
 
@@ -246,7 +246,7 @@
           usedIndexes.clear();
 
           if (!allWords.length) {
-            setStatus('CSV loaded but 0 usable rows. Check headers: word, definition, part of speech, example.');
+            setStatus("CSV loaded but 0 usable rows. Check headers word, definition, part of speech, example.");
             return;
           }
 
@@ -326,15 +326,15 @@
         speechSynthesis.cancel();
 
         const uWord = new SpeechSynthesisUtterance(word);
-        uWord.rate = 0.70;
+        uWord.rate = 0.65;
 
         const uText = new SpeechSynthesisUtterance(text);
-        uText.rate = 1.00;
+        uText.rate = 1.0;
 
         uWord.onend = () => {
           setTimeout(() => {
             speechSynthesis.speak(uText);
-          }, 450);
+          }, 500);
         };
 
         speechSynthesis.speak(uWord);
@@ -367,11 +367,11 @@
 
     document.getElementById("nextButton").addEventListener("click", showNextWord);
 
-    document.getElementById("showDefOnly").addEventListener("click", () => showMeaning(false));
     document.getElementById("showDefSpeak").addEventListener("click", () => showMeaning(true));
+    document.getElementById("showDefOnly").addEventListener("click", () => showMeaning(false));
 
-    document.getElementById("showExOnly").addEventListener("click", () => showExample(false));
     document.getElementById("showExSpeak").addEventListener("click", () => showExample(true));
+    document.getElementById("showExOnly").addEventListener("click", () => showExample(false));
 
     buildAlphabetButtons();
     loadCSV();
